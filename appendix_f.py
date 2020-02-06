@@ -127,11 +127,12 @@ class solver:
         scr[co] = self.ux_dt[co]/self.ux[co]
         max_ux = np.amax(scr)
         #print("1: ",max_ux)
-        if np.amax(abs(self.ux)) > 0.0:
+        '''if np.amax(abs(self.ux)) > 0.0:
             max_ux = np.amax(abs(self.ux_dt/self.ux))
         else:
             max_ux  = np.amax(abs(self.ux/self.dx))
-        #print("2: ",max_ux)
+        print("2: ",max_ux)
+        '''
 #        max_uy = np.amax(abs(np.where(self.uy != 0.0,self.uy_dt/self.uy,self.uy_dt/self.dy)))
 
         if np.amax(abs(self.uy)) > 0.0:
@@ -170,19 +171,30 @@ class solver:
         self.rho_bot = self.mu * self.m_u * (self.gamma - 1) / (self.kb * self.T_bot) * self.e_bot
 
         self.ux_top = (-self.ux[-3,:] + 4.*self.ux[-2,:])/3.
-        self.ux_bot = (-self.ux[2,:] + 4.*self.ux[1,:])/3.
+        self.ux_bot = (-self.ux[ 2,:] + 4.*self.ux[ 1,:])/3.
 
         # set boundary conditions
-        self.e[-1,:]   = -(self.e[-1,:]-self.e_top)/10.
-        self.e[0,:]    = -(self.e[ 0,:]-self.e_bot)/10.
+        # Forcing internal energy closer and closer to e_top and e_bot over 10 timesteps
+        self.e_dt[-1,:]   = -(self.e[-1,:]-self.e_top)/10.
+        self.e_dt[ 0,:]   = -(self.e[ 0,:]-self.e_bot)/10.
         #self.rho[-1,:] = self.rho_top
         #self.rho[0,:]  = self.rho_bot
-        self.ux[-1,:]  = self.ux_top
-        self.ux[0,:]   = self.ux_bot
+#        self.ux[-1,:]  = self.ux_top
+#        self.ux[0,:]   = self.ux_bot
         #self.uy[-1,:] = np.where(self.uy[-1,:] > 0.0, 0.0 , self.uy[-1,:])  #  = -self.uy[-2,:]
         #self.uy[ 0,:] = np.where(self.uy[0 ,:] < 0.0, 0.0 , self.uy[ 0,:])  #   = 0.
-        self.uy_dt[-1,:] = -self.uy[-1.:]/50.
-        self.uy_dt[ 0,:] = -self.uy[ 0,:]/50.
+        # Setting outflows to zero on upper and lower boundary
+
+        co=np.where(self.uy[-1,:] > 0.0)
+        scr=self.uy[-1,:]
+        scr[co]=0.0
+        self.uy[-1,:] = scr
+
+        co=np.where(self.uy[0,:] < 0.0)
+        scr=self.uy[0,:]
+        scr[co]=0.0
+        self.uy[0,:]=scr
+#        self.uy_dt[ 0,:] = -self.uy[ 0,:]/50.
 
     def upwind_x(self,func,u):
 
@@ -342,7 +354,7 @@ class solver:
         # d/dt
         self.rho_dt[1:-1,:] = self.rho_dt[1:-1,:]-self.rho[1:-1,:]*(cent_ux + cent_uy) - self.ux[1:-1,:]*upx_rho - self.uy[1:-1,:]*upy_rho
 
-        self.e_dt[1:-1,:]   = self.e_dt[1:-1.:]-self.e[1:-1,:]*(cent_ux + cent_uy) - self.ux[1:-1,:]*upx_e - self.uy[1:-1,:]*upy_e \
+        self.e_dt[1:-1,:]   = self.e_dt[1:-1,:]-self.e[1:-1,:]*(cent_ux + cent_uy) - self.ux[1:-1,:]*upx_e - self.uy[1:-1,:]*upy_e \
                               - self.e[1:-1,:]*(self.gamma - 1)*(cent_ux + cent_uy)
 #        self.e_dt[1, :]     = self.e_dt[1,:]-(self.e[1, :]-self.e[0, :])/0.001
 
@@ -455,4 +467,4 @@ if __name__ == '__main__':
     # solve.sanity()
 
     # animate results
-    solve.animate(seconds=1200,variable='T')
+    solve.animate(seconds=3000,variable='T')
