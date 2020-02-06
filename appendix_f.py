@@ -126,12 +126,12 @@ class solver:
 
         scr[co] = self.ux_dt[co]/self.ux[co]
         max_ux = np.amax(scr)
-        print("1: ",max_ux)
+        #print("1: ",max_ux)
         if np.amax(abs(self.ux)) > 0.0:
             max_ux = np.amax(abs(self.ux_dt/self.ux))
         else:
             max_ux  = np.amax(abs(self.ux/self.dx))
-        print("2: ",max_ux)
+        #print("2: ",max_ux)
 #        max_uy = np.amax(abs(np.where(self.uy != 0.0,self.uy_dt/self.uy,self.uy_dt/self.dy)))
 
         if np.amax(abs(self.uy)) > 0.0:
@@ -173,16 +173,16 @@ class solver:
         self.ux_bot = (-self.ux[2,:] + 4.*self.ux[1,:])/3.
 
         # set boundary conditions
-        self.e[-1,:]   = self.e[-1,:]-(self.e[-1,:]-self.e_top)/10.
-        self.e[0,:]    = self.e[0 ,:]-(self.e[ 0,:]-self.e_bot)/10.
-        self.rho[-1,:] = self.rho_top
-        self.rho[0,:]  = self.rho_bot
+        self.e[-1,:]   = -(self.e[-1,:]-self.e_top)/10.
+        self.e[0,:]    = -(self.e[ 0,:]-self.e_bot)/10.
+        #self.rho[-1,:] = self.rho_top
+        #self.rho[0,:]  = self.rho_bot
         self.ux[-1,:]  = self.ux_top
         self.ux[0,:]   = self.ux_bot
         #self.uy[-1,:] = np.where(self.uy[-1,:] > 0.0, 0.0 , self.uy[-1,:])  #  = -self.uy[-2,:]
         #self.uy[ 0,:] = np.where(self.uy[0 ,:] < 0.0, 0.0 , self.uy[ 0,:])  #   = 0.
-        self.uy[-1,:] = -self.uy[-2,:]
-        self.uy[ 0,:] =  0.0
+        self.uy_dt[-1,:] = -self.uy[-1.:]/50.
+        self.uy_dt[ 0,:] = -self.uy[ 0,:]/50.
 
     def upwind_x(self,func,u):
 
@@ -293,6 +293,9 @@ class solver:
         self.ux_dt  = np.zeros([self.ny,self.nx])
         self.uy_dt  = np.zeros([self.ny,self.nx])
 
+        # initiate (vertical) boundary conditions for rho, e, ux and uy
+        self.boundary_conditions()
+
         # flux
         rhoux = self.rho*self.ux
         rhouy = self.rho*self.uy
@@ -337,9 +340,9 @@ class solver:
         # upy_uyy = self.central_y(self.uy)
 
         # d/dt
-        self.rho_dt[1:-1,:] = -self.rho[1:-1,:]*(cent_ux + cent_uy) - self.ux[1:-1,:]*upx_rho - self.uy[1:-1,:]*upy_rho
+        self.rho_dt[1:-1,:] = self.rho_dt[1:-1,:]-self.rho[1:-1,:]*(cent_ux + cent_uy) - self.ux[1:-1,:]*upx_rho - self.uy[1:-1,:]*upy_rho
 
-        self.e_dt[1:-1,:]   = -self.e[1:-1,:]*(cent_ux + cent_uy) - self.ux[1:-1,:]*upx_e - self.uy[1:-1,:]*upy_e \
+        self.e_dt[1:-1,:]   = self.e_dt[1:-1.:]-self.e[1:-1,:]*(cent_ux + cent_uy) - self.ux[1:-1,:]*upx_e - self.uy[1:-1,:]*upy_e \
                               - self.e[1:-1,:]*(self.gamma - 1)*(cent_ux + cent_uy)
 #        self.e_dt[1, :]     = self.e_dt[1,:]-(self.e[1, :]-self.e[0, :])/0.001
 
@@ -380,8 +383,6 @@ class solver:
                     print("                (x,y) : ", i, fx, fy, self.e[fx, fy])
                     self.update = False
 
-        # initiate (vertical) boundary conditions for rho, e, ux and uy
-        self.boundary_conditions()
 
         # compute temperature and pressure
         self.T[:] = (self.gamma - 1) * self.e * self.mu * self.m_u / (self.kb * self.rho)
@@ -454,4 +455,4 @@ if __name__ == '__main__':
     # solve.sanity()
 
     # animate results
-    solve.animate(seconds=1000,variable='T')
+    solve.animate(seconds=1200,variable='T')
