@@ -119,14 +119,25 @@ class solver:
         # takes into account that velocity can be zero
         #print("dx",self.dx,np.amin(abs(self.ux)))
         #print(np.where(self.ux != 0.0,self.ux_dt/self.ux,self.ux_dt/self.dx))
-        max_ux = np.amax(abs(np.where(self.ux != 0.0,self.ux_dt/self.ux,self.ux_dt/self.dx)))
+ #       max_ux = np.amax(abs(np.where(self.ux != 0.0,self.ux_dt/self.ux,self.ux_dt/self.dx)))
 
-        max_uy = np.amax(abs(np.where(self.uy != 0.0,self.uy_dt/self.uy,self.uy_dt/self.dy)))
+        co = np.where(abs(self.ux) > 1.0/self.dx)
+        scr=self.ux/self.dx
 
-#        if np.amin(abs(self.uy)) > 0.0:
-#            max_uy = np.amax(abs(self.uy_dt/self.uy))
-#        else:
-#            max_uy  = np.amax(abs(self.uy/self.dy))
+        scr[co] = self.ux_dt[co]/self.ux[co]
+        max_ux = np.amax(scr)
+        print("1: ",max_ux)
+        if np.amax(abs(self.ux)) > 0.0:
+            max_ux = np.amax(abs(self.ux_dt/self.ux))
+        else:
+            max_ux  = np.amax(abs(self.ux/self.dx))
+        print("2: ",max_ux)
+#        max_uy = np.amax(abs(np.where(self.uy != 0.0,self.uy_dt/self.uy,self.uy_dt/self.dy)))
+
+        if np.amax(abs(self.uy)) > 0.0:
+            max_uy = np.amax(abs(self.uy_dt/self.uy))
+        else:
+            max_uy  = np.amax(abs(self.uy/self.dy))
 
 
         self.max_num = np.array([max_rho, max_e, max_ux, max_uy]).max()
@@ -356,7 +367,7 @@ class solver:
                     fx = scr[0][i]
                     fy = scr[1][i]
                     print("                (x,y) : ",i,fx,fy,self.rho[fx,fy])
-                    print("Terms: ",-self.rho[1:,:][fx-1,fy],cent_ux[fx-1,fy] ,cent_uy[fx-1,fy] )#,- self.ux[fx-1,fy]*upx_rho[fx-1,fy],self.uy[fx-1,fy]*upy_rho[fx-1,fy])
+#                    print("Terms: ",-self.rho[1:,:][fx-1,fy],cent_ux[fx-1,fy] ,cent_uy[fx-1,fy] )#,- self.ux[fx-1,fy]*upx_rho[fx-1,fy],self.uy[fx-1,fy]*upy_rho[fx-1,fy])
 #                self.rho[scr[0],scr[1]] =100.
                     self.update = False
 
@@ -386,9 +397,9 @@ class solver:
         """
         visualise simulation for specified variable (default is temperature)
         """
-
+        print("variable",variable)
         vis.save_data(seconds, solve.hydro_solver, rho=solve.rho, u=solve.ux, w=solve.uy, T=solve.T, P=solve.P,\
-                      sim_fps=0.5,folder=variable)
+                      sim_fps=0.1,folder=variable)
         vis.animate_2D(variable,showQuiver=True,quiverscale=3.,extent=[0,12,0,4,'Mm'],cmap='plasma',save=False)
         vis.delete_current_data()
 
@@ -443,4 +454,4 @@ if __name__ == '__main__':
     # solve.sanity()
 
     # animate results
-    solve.animate(seconds=10,variable='T')
+    solve.animate(seconds=1000,variable='T')
