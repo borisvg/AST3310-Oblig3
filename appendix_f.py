@@ -126,14 +126,20 @@ class solver:
 
         scr[co] = self.ux_dt[co]/self.ux[co]
         max_ux = np.amax(scr)
+
         #print("1: ",max_ux)
-        '''if np.amax(abs(self.ux)) > 0.0:
+        if np.amax(abs(self.ux)) > 0.0:
             max_ux = np.amax(abs(self.ux_dt/self.ux))
         else:
             max_ux  = np.amax(abs(self.ux/self.dx))
-        print("2: ",max_ux)
-        '''
-#        max_uy = np.amax(abs(np.where(self.uy != 0.0,self.uy_dt/self.uy,self.uy_dt/self.dy)))
+        #print("2: ",max_ux)
+
+        #max_uy = np.amax(abs(np.where(self.uy != 0.0,self.uy_dt/self.uy,self.uy_dt/self.dy)))
+        #co = np.where(abs(self.uy) > 1.0/self.dy)
+        #scr = self.uy/self.dy
+
+        #scr[co] = self.uy_dt[co]/self.uy[co]
+#        max_uy = np.amax(scr)
 
         if np.amax(abs(self.uy)) > 0.0:
             max_uy = np.amax(abs(self.uy_dt/self.uy))
@@ -175,8 +181,8 @@ class solver:
 
         # set boundary conditions
         # Forcing internal energy closer and closer to e_top and e_bot over 10 timesteps
-        self.e_dt[-1,:]   = -(self.e[-1,:]-self.e_top)/10.
-        self.e_dt[ 0,:]   = -(self.e[ 0,:]-self.e_bot)/10.
+        self.e_dt[-1,:]   = -(self.e[-1,:]-self.e_top)/100.
+        self.e_dt[ 0,:]   = -(self.e[ 0,:]-self.e_bot)/100.
         #self.rho[-1,:] = self.rho_top
         #self.rho[0,:]  = self.rho_bot
 #        self.ux[-1,:]  = self.ux_top
@@ -413,7 +419,7 @@ class solver:
         print("variable",variable)
         vis.save_data(seconds, solve.hydro_solver, rho=solve.rho, u=solve.ux, w=solve.uy, T=solve.T, P=solve.P,\
                       sim_fps=0.1,folder=variable)
-        vis.animate_2D(variable,showQuiver=True,quiverscale=3.,extent=[0,12,0,4,'Mm'],cmap='plasma',save=False)
+        vis.animate_2D(variable,showQuiver=True,quiverscale=1.0,extent=[0,12,0,4,'Mm'],cmap='plasma',save=False,video_fps=25)
         vis.delete_current_data()
 
     def animate_1D(self, array):
@@ -443,7 +449,7 @@ class solver:
         anim = animation.FuncAnimation(fig, animate, init_func=init,
     								   frames=self.t_max, interval=200, blit=True)
 
-        anim.save('total_pressure.mp4', fps=100, extra_args=['-vcodec', 'libx264'])
+        anim.save('total_pressure.mp4', fps=50, extra_args=['-vcodec', 'libx264'])
         plt.show()
 
 
@@ -467,4 +473,4 @@ if __name__ == '__main__':
     # solve.sanity()
 
     # animate results
-    solve.animate(seconds=3000,variable='T')
+    solve.animate(seconds=3000,variable='dP')
