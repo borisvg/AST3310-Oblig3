@@ -34,19 +34,19 @@ class solver:
 
         # box setup
         x0 = 0
-        self.x1 = 12e6     # [m]
+        self.x1 = 5e6     # [m]
 
         y0 = 0             # top of the box
-        self.y1 = 4e6      # [m]
+        self.y1 = 2e6      # [m]
 
         self.nx = 300
-        self.ny = 100
+        self.ny = 100+2
 
         self.dx = self.x1/(self.nx-1)
         self.dy = self.y1/(self.ny-1)
 
         self.x = np.linspace(x0, self.x1, self.nx)
-        self.y = np.linspace(y0, self.y1, self.ny)
+        self.y = np.linspace(y0-self.dy, self.y1, self.ny)
 
         self.update = True
 
@@ -72,22 +72,27 @@ class solver:
         self.P[-1,:] = self.P0
 
         # append values from the top down (bottom up in sim)
-        for j in range(0,self.ny):
-            print(j,-(j+1))
+        for j in range(1, self.ny):
             self.T[-(j+1),:] = self.T0 - (self.mu * self.m_u * self.g * self.nabla * self.y[j]) / self.kb
             self.P[-(j+1),:] = self.P0 * (self.T[-(j+1),:]/self.T0)**(1./self.nabla)
 
         # add perturbation
         if perturbation:
-            self.perturbation(self.T,self.T0, 0.2)     # const = 0.25 gives best results
+            self.perturbation(self.T,self.T, 0.01)     # const = 0.25 gives best results
+            pt=(np.random.rand(self.ny,self.nx)-0.5)*2*0.001
+            self.P[:,:] = self.P[:,:]*(1+pt)
+            print(type(pt),pt.size,np.amax(pt),np.amin(pt))
             #self.perturbation(self.rho,self.rho[0,0], 0.1)
 
         self.rho = (self.mu * self.m_u * self.P) / (self.kb * self.T)
         #print(self.rho[:,1])
         self.e   = self.P / (self.gamma - 1.)
 
-        for j in range(0, self.ny):
-            print("%3i %8.3e %8.3e %8.3e %8.3e" % (j, self.T[j, 0], self.P[j, 0], self.rho[j, 0], self.e[j, 0]))
+        # now make sure that even using the low order operators we have, the atmosphere is in equilibrium
+        # the problem is only at boundaries.
+
+        #for j in range(0, self.ny):
+        #    print("%3i %8.3e %8.3e %8.3e %8.3e" % (j, self.T[j, 0], self.P[j, 0], self.rho[j, 0], self.e[j, 0]))
 
         # # set upper and lower values of the initial temperature
         self.T_top = self.T[-1:]
@@ -163,10 +168,9 @@ class solver:
 
         #max_uy = np.amax(abs(np.where(self.uy != 0.0,self.uy_dt/self.uy,self.uy_dt/self.dy)))
 
-
         max_uy = np.amax((np.abs(self.uy) + np.abs(self.uy_dt) * self.dt) / self.dy)
 
-        self.max_num = np.array([max_rho, max_e, max_ux, max_uy]).max()
+        self.max_num = np.array([max_rho, max_e]).max()
 
         #self.check_num = np.array([max_rho, max_e, max_ux, max_uy])
         dt2=0.0
@@ -184,8 +188,6 @@ class solver:
         print("%4i %6.3f %6.3f %10.2e %10.2e %10.2e %10.2e" % (self.timesteps,self.dt,self.tottime,max_rho,max_e,max_ux,max_uy))
 
         return dt2
-
-
 
     def boundary_conditions(self):
 
@@ -211,25 +213,53 @@ class solver:
 
         # set boundary conditions
         # Forcing internal energy closer and closer to e_top and e_bot over 10 timesteps
-        self.e_dt[-1,:]   = self.e_dt[-1,:]-(self.e[-1,:]-self.e_top*0.5)/10.
-        self.e_dt[ 0,:]   = self.e_dt[ 0,:]-(self.e[ 0,:]-self.e_bot*1.2)/50.
+#        self.e_dt[-1,:]   = self.e_dt[-1,:]-(self.rho[-1,:]/self.rho_top)**2*(self.e[-1,:]-self.e_top*0.8)/100.
+#        self.e_dt[ 0,:]   = self.e_dt[ 0,:]-(self.e[ 0,:]-self.e_bot*1.01)/1000.
+
+
+#        self.e_dt[-1, :] = - (self.rho[-1, :] / self.rho_top) * (self.e[-1, :] - self.e_top * 0.8) / 100.
+        self.e[-1, :] = self.e_top*0.99
+        self.e_dt[-2, :] = - (self.rho[-2,:]/self.rho_top)*(self.e[-2, :] - self.e[-1, :]) / 10000.
+        self.e_dt[-1, :] = 0.0
+
+        self.e_dt[1, :] = - (self.e[1, :] - self.e_bot) / 10000.
+        self.e[0, :] = self.e_bot
+        self.e_dt[0, :] = 0.0
+
+        self.rho[-1,:]=self.rho_top
+        self.rho[0,:] = self.rho_bot
+        self.rho_dt[-1,:] = 0.0
+        self.rho_dt[0,:] = 0.0
+
+
 #        self.rho[-1,:] = self.rho_top
 #        self.rho[0,:]  = self.rho_bot
-        self.ux[-1,:]  = self.ux_top
-        self.ux[0,:]   = self.ux_bot
+#        self.ux[-1,:]  = self.ux_top
+#        self.ux[0,:]   = self.ux_bot
 #        self.uy[-1,:] = np.where(self.uy[-1,:] > 0.0, 0.0 , self.uy[-1,:])  #  = -self.uy[-2,:]
 #        self.uy[ 0,:] = np.where(self.uy[0 ,:] < 0.0, 0.0 , self.uy[ 0,:])  #   = 0.
-        # Setting outflows to zero on upper and lower boundary
+# Setting outflows to zero on upper and lower boundary
 
         co=np.where(self.uy[-1,:] > 0.0)
         scr=self.uy[-1,:]
         scr[co]=0.0
-        self.uy[-1,:] = scr
+#        self.uy[-1,:] = scr
+        self.uy[-1,:] = -self.uy[-2,:]
+        self.uy_dt[-1,:] = 0.0
+        self.uy[0,:] = -self.uy[1,:]
+        self.uy_dt[0,:]=0.0
 
-        co=np.where(self.uy[0,:] < 0.0)
-        scr=self.uy[0,:]
-        scr[co]=0.0
-        self.uy[0,:]=scr
+        self.ux[-1,:] = 0.0 #self.ux[-2,:]
+        self.ux_dt[-1,:] = 0.0
+        self.ux_dt[-2,:] = self.ux_dt[-2,:]*0.5
+        self.ux[0,:] = 0.0
+        self.ux_dt[0,:] = 0.0
+        self.ux_dt[1,:] = self.ux_dt[1,:]*0.5
+
+#        co=np.where(self.uy[0,:] < 0.0)
+#        scr=self.uy[0,:]
+#        scr[co]=0.0
+#        self.uy[0,:]=scr
 #        self.uy_dt[ 0,:] = -self.uy[ 0,:]/50.
 
     def upwind_x(self,func,u):
@@ -239,7 +269,7 @@ class solver:
         excludes upper and lower boundaries
         """
 
-        left_func  = np.roll(func ,  1, axis=1)   # roll function to i-1 (since the array is "upside down")
+        left_func  = np.roll(func,  1, axis=1)   # roll function to i-1 (since the array is "upside down")
         right_func = np.roll(func, -1, axis=1)    # roll function to i+1
         func2= func
 
@@ -270,16 +300,25 @@ class solver:
 
         y, x = np.where(u < 0)
         if len(x) != 0:
-            # upwind scheme, excluding boundary calculation
+        #     # upwind scheme, excluding boundary calculation
             return_func[y,x] = (right_func[y,x] - func2[y,x])/self.dy
 
         # must convert to extrapolation scheme at boundary
 
+#        return_func[ 0, :] = (right_func[0, :] - func2[0, :]) / self.dy
 #        return_func[-1, :] = (func2[-1, :] - left_func[-1, :]) / self.dy
-#        return_func[0, :] = (right_func[0, :] - func2[0, :]) / self.dy
+
+        #return_func[-1, :] = (right_func[-1, :] - func2[-1, :]) / self.dy
+        #return_func[ 0, :] = (func2[0, :] - left_func[0, :]) / self.dy
+        # x = np.where(u[-1,:] < 0)
+        # if len(x) != 0:
+        #     return_func[-1, :] = 0.0
+        #
+        # x=np.where(u[0,:] > 0)
+        # if len(x) != 0:
+        #     return_func[0,:] = 0.0
 
         return return_func
-
 
     def central_x(self,func):
 
@@ -309,10 +348,9 @@ class solver:
         # central scheme, excluding boundary calculation
         return_func = (right_func - left_func)/(2.*self.dy)
 
-        # central scheme becomes one-sided at boundaries
-        return_func[0,:] = (func[0,:]-left_func[0,:])/self.dy
-        return_func[-1,:] = (right_func[-1,:]-func[-1,:])/self.dy
-
+        # central scheme becomes one-sided at boundaries - Need 3 points to maintain 2nd order
+        #return_func[-1,:] = (0.5*func[-3,:]-2*func[-2,:]+1.5*func[-1,:])/self.dy
+        #return_func[ 0,:] = (-1.5*func[0,:]+2*func[1,:]-0.5*func[2,:])/self.dy
         return return_func
 
     def convective_flux(self):
@@ -367,7 +405,6 @@ class solver:
         cent_px = self.central_x(self.P)
         cent_py = self.central_y(self.P)
 
-
         # density-velocity upwind
         upx_rho = self.upwind_x(self.rho,self.ux)
         upy_rho = self.upwind_y(self.rho,self.uy)
@@ -404,19 +441,29 @@ class solver:
                         - self.ux*upx_rho               \
                         - self.uy*upy_rho
 
-#        self.e_dt   =   self.e_dt                       \
-#                        -self.e*(cent_ux + cent_uy)     \
-#                        - self.ux*upx_e                 \
-#                        - self.uy*upy_e                 \
-#                        - self.e*(self.gamma - 1)*(cent_ux + cent_uy)
+        self.e_dt   =   self.e_dt                       \
+                        - self.e*(cent_ux + cent_uy)     \
+                        - self.ux*upx_e                 \
+                        - self.uy*upy_e                 \
+                        - self.e*(self.gamma - 1)*(cent_ux + cent_uy)
 #        self.e_dt[1, :]     = self.e_dt[1,:]-(self.e[1, :]-self.e[0, :])/0.001
 
+# Trying with momentum
+
+        px_dt = - rhoux * upx_uxx - self.ux * upx_rhouxx - cent_px \
+                - rhoux * upy_uyy - self.uy * upy_rhouxy
+
+        py_dt = - rhouy * upx_uxx - self.ux * upx_rhouyx \
+                - rhouy * upy_uyx - self.uy * upy_rhouyy - cent_py
 
         self.ux_dt  =   (   -rhoux*(upx_uxx + upy_uyx)      \
                             -self.ux*upx_rhouxx             \
                             -self.uy*upy_rhouxy             \
                             -cent_px)                       \
                         /self.rho
+        check = px_dt /self.rho -self.ux/self.rho * self.rho_dt-self.ux_dt
+
+        print("CHECK: ",np.max(np.abs(check)))
 
         self.uy_dt  =   (   -rhouy*(upx_uxy + upy_uyy)      \
                             -self.uy*upy_rhouyy             \
@@ -426,16 +473,17 @@ class solver:
 
 
         self.boundary_conditions()
+
         # calculate timestep
         dt = self.timestep()
 
 
         # update variables
         if self.update == True :
-            self.rho[:] = self.rho #+ self.rho_dt*dt
+            self.rho[:] = self.rho + self.rho_dt*dt
             self.e[:]   = self.e   + self.e_dt*dt
-            self.ux[:]  = self.ux  #+ self.ux_dt*dt
-            self.uy[:]  = self.uy  #+ self.uy_dt*dt
+            self.ux[:]  = self.ux  + self.ux_dt*dt
+            self.uy[:]  = self.uy  + self.uy_dt*dt
 
             scr = np.where(self.rho <= 0.0)
             if len(scr[0]) > 0 :
@@ -474,9 +522,9 @@ class solver:
         """
         print("variable",variable)
         vis.save_data(seconds, solve.hydro_solver, rho=solve.rho, u=solve.ux, w=solve.uy, T=solve.T, P=solve.P,\
-                      sim_fps=10,folder=variable)
-        vis.animate_2D(variable,showQuiver=True,quiverscale=1.0,extent=[0,12,0,4,'Mm'],cmap='plasma',save=False,\
-                       video_fps=10)
+                      sim_fps=1,folder=variable)
+        vis.animate_2D(variable,showQuiver=True,quiverscale=2.0,extent=[0,12,0,4,'Mm'],cmap='plasma',save=False,\
+                       video_fps=46)
         vis.delete_current_data()
 
     def animate_1D(self, array):
@@ -530,4 +578,5 @@ if __name__ == '__main__':
     # solve.sanity()
 
     # animate results
-    solve.animate(seconds=10,variable='T')
+    solve.animate(seconds=1200,variable='dP')
+
